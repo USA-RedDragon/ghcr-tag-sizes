@@ -7,9 +7,12 @@ import { readFileSync } from "node:fs";
 
 export type Target = "firefox" | "chrome";
 
-const { version } = JSON.parse(
+// AMO rejects re-used versions, so CI stamps a unique EXT_VERSION per build
+// (`<pkg.version>.<run_number>`); locally we fall back to package.json.
+const { version: pkgVersion } = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8")
 ) as { version: string };
+const version = process.env.EXT_VERSION ?? pkgVersion;
 
 export function generateManifest(target: Target): Record<string, unknown> {
   const base = {

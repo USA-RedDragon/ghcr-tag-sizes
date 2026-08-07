@@ -38,14 +38,34 @@ jobs:
       - name: Unit + DOM-contract tests
         run: npm test
 
+      # AMO rejects a re-used version, so stamp a unique one per run for the signed build.
+      - name: Compute build version
+        run: echo "EXT_VERSION=$(node -p "require('./package.json').version").${{ github.run_number }}" >> "$GITHUB_ENV"
+
       - name: Build & package Firefox + Chrome
         run: npm run package
+
+      - name: Sign Firefox (AMO, unlisted)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.WEB_EXT_API_KEY }}
+          WEB_EXT_API_SECRET: ${{ secrets.WEB_EXT_API_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WEB_EXT_API_KEY:-}" ] || [ -z "${WEB_EXT_API_SECRET:-}" ]; then
+            echo "AMO credentials not set — skipping Firefox signing."
+            exit 0
+          fi
+          # Reuse the dist/firefox we just built — sign it in place, no rebuild.
+          npx web-ext sign --source-dir dist/firefox --channel unlisted --artifacts-dir artifacts
 
       - name: Upload extension packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: extension-packages
-          path: artifacts/*.zip
+          path: |
+            artifacts/*.zip
+            artifacts/*.xpi
           if-no-files-found: error
 
   live-registry:
@@ -86,11 +106,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # Re-point the single "latest" release/tag at this commit with fresh zips.
+          shopt -s nullglob
+          # Firefox: the signed .xpi (installable). Chrome: the unpacked-loadable .zip.
+          assets=(artifacts/ghcr-tag-sizes-chrome.zip artifacts/*.xpi)
+          if [ ${#assets[@]} -eq 0 ]; then echo "No release assets found"; exit 1; fi
+          # Re-point the single "latest" release/tag at this commit with fresh assets.
           gh release delete latest --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
-          gh release create latest artifacts/*.zip \
+          gh release create latest "${assets[@]}" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "Latest build" \
-            --notes "Automated build from ${GITHUB_SHA}. Download the Firefox or Chrome package below." \
+            --notes "Automated build from ${GITHUB_SHA}. Firefox: install the signed .xpi. Chrome: load the unpacked .zip." \
             --latest
