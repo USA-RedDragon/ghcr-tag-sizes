@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <rect width="96" height="96" rx="20" fill="#1f6feb"/>
+  <!-- package cube -->
+  <g fill="none" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M48 20 L74 34 V62 L48 76 L22 62 V34 Z"/>
+    <path d="M22 34 L48 48 L74 34"/>
+    <path d="M48 48 V76"/>
+  </g>
+  <!-- size ruler tick marks along the bottom edge -->
+  <g stroke="#cfe3ff" stroke-width="3" stroke-linecap="round">
+    <line x1="30" y1="84" x2="30" y2="90"/>
+    <line x1="42" y1="84" x2="42" y2="90"/>
+    <line x1="54" y1="84" x2="54" y2="90"/>
+    <line x1="66" y1="84" x2="66" y2="90"/>
+  </g>
+</svg>

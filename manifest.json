@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "GHCR Tag Sizes",
+  "version": "1.0.0",
+  "description": "Shows the total layer size (per architecture) of each tag on GitHub Container Registry package pages.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ghcr-tag-sizes@mcswain.dev",
+      "strict_min_version": "115.0"
+    }
+  },
+  "host_permissions": ["https://ghcr.io/*"],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://github.com/orgs/*/packages/container/*",
+        "https://github.com/users/*/packages/container/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png"
+  },
+  "action": {
+    "default_title": "GHCR Tag Sizes"
+  }
+}

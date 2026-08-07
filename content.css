@@ -1,0 +1,38 @@
+/* GHCR Tag Sizes — injected badge styling. Mirrors GitHub's muted metadata look
+   and adapts to light/dark themes via GitHub's CSS variables. */
+
+.ghcr-size-badge {
+  margin-top: 4px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--fgColor-muted, var(--color-fg-muted, #656d76));
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0;
+}
+
+.ghcr-size-badge[aria-busy="true"] {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.ghcr-size-badge--error {
+  color: var(--fgColor-muted, var(--color-fg-muted, #656d76));
+  opacity: 0.85;
+}
+
+.ghcr-size-arch {
+  color: var(--fgColor-muted, var(--color-fg-muted, #656d76));
+}
+
+.ghcr-size-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--fgColor-default, var(--color-fg-default, #1f2328));
+}
+
+.ghcr-size-sep {
+  color: var(--borderColor-default, var(--color-border-default, #d0d7de));
+}
