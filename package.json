@@ -33,7 +33,7 @@
     "geckodriver": "6.1.1",
     "jsdom": "30.0.1",
     "selenium-webdriver": "4.46.0",
-    "tsx": "4.23.10",
+    "tsx": "4.23.11",
     "typescript": "7.0.2",
     "vite": "8.2.1",
     "vite-plugin-web-extension": "4.5.1",
