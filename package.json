@@ -4,26 +4,38 @@
   "description": "Firefox/Chrome extension that shows per-architecture layer sizes for GHCR tags on GitHub package pages.",
   "private": true,
   "license": "MIT",
-  "type": "commonjs",
+  "type": "module",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "build": "node build.mjs",
-    "build:dirs": "node build.mjs --no-zip",
-    "lint": "npm run build:dirs && web-ext lint --source-dir dist/firefox --no-config",
-    "test": "node --test test/unit/*.test.js test/dom/*.test.js",
-    "test:live": "node --test test/live/*.test.js",
-    "dev:firefox": "npm run build:dirs && web-ext run --source-dir dist/firefox --start-url https://github.com/orgs/clevyr/packages/container/package/scaffold",
-    "dev:chrome": "npm run build:dirs && web-ext run --target chromium --source-dir dist/chrome --start-url https://github.com/orgs/clevyr/packages/container/package/scaffold",
-    "e2e:firefox": "npm run build:dirs && node test/e2e/run.mjs firefox",
-    "e2e:chrome": "npm run build:dirs && node test/e2e/run.mjs chrome",
+    "typecheck": "tsc --noEmit",
+    "build:firefox": "TARGET=firefox vite build",
+    "build:chrome": "TARGET=chrome vite build",
+    "build": "npm run build:firefox && npm run build:chrome",
+    "package:firefox": "web-ext build -s dist/firefox -a artifacts --filename ghcr-tag-sizes-firefox.zip --overwrite-dest",
+    "package:chrome": "web-ext build -s dist/chrome -a artifacts --filename ghcr-tag-sizes-chrome.zip --overwrite-dest",
+    "package": "npm run build && npm run package:firefox && npm run package:chrome",
+    "lint": "npm run build:firefox && web-ext lint --source-dir dist/firefox --no-config",
+    "test": "node --import tsx --test test/unit/*.test.ts test/dom/*.test.ts",
+    "test:live": "node --import tsx --test test/live/*.test.ts",
+    "dev:firefox": "TARGET=firefox vite",
+    "dev:chrome": "TARGET=chrome vite",
+    "e2e:firefox": "npm run build:firefox && node --import tsx test/e2e/run.mts firefox",
+    "e2e:chrome": "npm run build:chrome && node --import tsx test/e2e/run.mts chrome",
     "e2e": "npm run e2e:firefox && npm run e2e:chrome"
   },
   "devDependencies": {
-    "geckodriver": "6.1.1",
-    "jsdom": "30.0.1",
-    "selenium-webdriver": "4.46.0",
-    "web-ext": "10.6.0"
+    "@types/jsdom": "^28.0.3",
+    "@types/node": "^26.1.2",
+    "@types/selenium-webdriver": "^4.35.6",
+    "geckodriver": "^6.1.1",
+    "jsdom": "^30.0.1",
+    "selenium-webdriver": "^4.46.0",
+    "tsx": "^4.23.10",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1",
+    "vite-plugin-web-extension": "^4.5.1",
+    "web-ext": "^10.6.0"
   }
 }

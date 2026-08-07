@@ -26,22 +26,6 @@ download size — read straight from the OCI image manifest.
   anything else shows `🔒 sign in to view size`.
 - Attestation/provenance entries (platform `unknown`) are skipped.
 
-## Project layout
-
-Most of the code is shared across both browsers; only the manifest's background
-declaration and a namespace shim differ.
-
-| File | Purpose |
-| --- | --- |
-| `lib.js` | Shared pure/DOM helpers (size math, platform labels, digest extraction). Loaded in both browsers **and** required by the tests. |
-| `background.js` | Token + manifest fetch, per-arch size compute, digest cache. Cross-browser (`browser`/`chrome` shim; Chrome pulls in `lib.js` via `importScripts`). |
-| `content.js` | Scans version rows, injects the size badge, handles Turbo navigation. |
-| `content.css` | Badge styling (theme-aware). |
-| `manifest.json` | **Firefox** MV3 manifest (event-page `background.scripts`). |
-| `manifest.chrome.json` | **Chrome** MV3 manifest (`background.service_worker`). |
-| `build.mjs` | Assembles `dist/<target>/` + zips to `artifacts/`. |
-| `test/` | Unit, DOM-contract, live-registry, and e2e tests. |
-
 ## Develop
 
 ```sh
@@ -82,33 +66,3 @@ What each layer catches:
   and Chrome against live GitHub and asserts badges render with real per-arch sizes.
   This is the only full-stack check; it's also the most likely to break on upstream
   changes, so it runs **nightly, not on PRs**.
-
-### Refreshing the DOM fixtures
-
-```sh
-curl -sL "https://github.com/orgs/clevyr/packages/container/package/scaffold" \
-  -o test/fixtures/tagged-overview.html
-curl -sL "https://github.com/orgs/clevyr/packages/container/scaffold/versions?filters%5Bversion_type%5D=untagged" \
-  -o test/fixtures/untagged-versions.html
-```
-
-## Build / package
-
-```sh
-npm run build     # -> artifacts/ghcr-tag-sizes-firefox-<v>.zip
-                  #    artifacts/ghcr-tag-sizes-chrome-<v>.zip
-```
-
-Upload the Firefox zip to addons.mozilla.org and the Chrome zip to the Chrome Web
-Store.
-
-## CI
-
-- **`.github/workflows/ci.yml`** (every push/PR): `web-ext lint`, unit + DOM-contract
-  tests, the live-registry check (isolated job), and the dual-target build, uploading
-  both zips as artifacts.
-- **`.github/workflows/e2e.yml`** (nightly + manual): the Firefox/Chrome browser
-  canary. Non-blocking by design — a failure signals "upstream changed", not "this PR
-  is broken".
-
-All third-party actions are `actions/*` only and pinned to a full commit SHA.
