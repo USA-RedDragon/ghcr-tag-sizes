@@ -1,0 +1,29 @@
+{
+  "name": "ghcr-tag-sizes",
+  "version": "1.0.0",
+  "description": "Firefox/Chrome extension that shows per-architecture layer sizes for GHCR tags on GitHub package pages.",
+  "private": true,
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "build:dirs": "node build.mjs --no-zip",
+    "lint": "npm run build:dirs && web-ext lint --source-dir dist/firefox --no-config",
+    "test": "node --test test/unit/*.test.js test/dom/*.test.js",
+    "test:live": "node --test test/live/*.test.js",
+    "dev:firefox": "npm run build:dirs && web-ext run --source-dir dist/firefox --start-url https://github.com/orgs/clevyr/packages/container/package/scaffold",
+    "dev:chrome": "npm run build:dirs && web-ext run --target chromium --source-dir dist/chrome --start-url https://github.com/orgs/clevyr/packages/container/package/scaffold",
+    "e2e:firefox": "npm run build:dirs && node test/e2e/run.mjs firefox",
+    "e2e:chrome": "npm run build:dirs && node test/e2e/run.mjs chrome",
+    "e2e": "npm run e2e:firefox && npm run e2e:chrome"
+  },
+  "devDependencies": {
+    "geckodriver": "^6.1.1",
+    "jsdom": "^30.0.1",
+    "selenium-webdriver": "^4.46.0",
+    "web-ext": "^10.6.0"
+  }
+}

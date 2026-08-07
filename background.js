@@ -9,6 +9,17 @@
 // automatically — public images resolve via the anonymous pull token, private images
 // the user can access ride on their existing session. No PAT, ever. Images the session
 // can't read surface a "sign in required" note.
+//
+// Cross-browser: Firefox loads lib.js via the manifest's background.scripts array;
+// Chrome's service worker pulls it in with importScripts below. The `api` alias spans
+// browser.* (Firefox) and chrome.* (Chrome).
+
+if (typeof GHCR === "undefined" && typeof importScripts === "function") {
+  // Chrome MV3 service worker — lib.js isn't preloaded, so pull it in.
+  importScripts("lib.js");
+}
+
+const api = globalThis.browser ?? globalThis.chrome;
 
 const REGISTRY = "https://ghcr.io";
 
@@ -66,26 +77,6 @@ async function fetchManifest(image, ref, token) {
   return res.json();
 }
 
-/** Sum the compressed layer sizes of a single-platform manifest. */
-function sumLayers(manifest) {
-  const layers = manifest.layers || [];
-  return layers.reduce((total, l) => total + (l.size || 0), 0);
-}
-
-/** Human label for a platform block, e.g. "amd64", "arm/v7", "windows/amd64". */
-function platformLabel(platform) {
-  if (!platform) return "image";
-  const { os, architecture, variant } = platform;
-  const arch = variant ? `${architecture}/${variant}` : architecture;
-  return os && os !== "linux" ? `${os}/${arch}` : arch;
-}
-
-/** Attestation / provenance entries carry an "unknown" platform — not a real arch. */
-function isAttestation(entry) {
-  const p = entry.platform || {};
-  return p.os === "unknown" || p.architecture === "unknown";
-}
-
 /**
  * Resolve the per-architecture layer sizes for `image@digest`.
  * Returns { arches: [{ label, bytes }] }.
@@ -96,32 +87,27 @@ async function resolveSizes(image, digest) {
 
   const token = await getToken(image);
   const top = await fetchManifest(image, digest, token);
+  const arches = await GHCR.computeArches(top, (d) =>
+    fetchManifest(image, d, token)
+  );
 
-  let arches;
-  if (Array.isArray(top.manifests)) {
-    // Image index / manifest list -> one sub-manifest per platform.
-    const real = top.manifests.filter((e) => !isAttestation(e));
-    arches = await Promise.all(
-      real.map(async (entry) => {
-        const sub = await fetchManifest(image, entry.digest, token);
-        return { label: platformLabel(entry.platform), bytes: sumLayers(sub) };
-      })
-    );
-  } else {
-    // Single-platform manifest.
-    arches = [{ label: "image", bytes: sumLayers(top) }];
-  }
-
-  arches.sort((a, b) => a.label.localeCompare(b.label));
   const result = { arches };
   sizeCache.set(cacheKey, result);
   return result;
 }
 
-browser.runtime.onMessage.addListener((msg) => {
+// sendResponse + `return true` is the one pattern that works in both Firefox and
+// Chrome (Chrome ignores a promise returned from the listener).
+api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!msg || msg.type !== "getSize") return;
-  return resolveSizes(msg.image, msg.digest).catch((err) => {
-    if (err instanceof AuthError) return { needsAuth: true };
-    return { error: err.message || String(err) };
-  });
+  resolveSizes(msg.image, msg.digest)
+    .then(sendResponse)
+    .catch((err) =>
+      sendResponse(
+        err instanceof AuthError
+          ? { needsAuth: true }
+          : { error: err.message || String(err) }
+      )
+    );
+  return true;
 });
