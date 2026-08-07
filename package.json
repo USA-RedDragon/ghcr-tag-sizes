@@ -16,7 +16,7 @@
     "package:firefox": "web-ext build -s dist/firefox -a artifacts --filename ghcr-tag-sizes-firefox.zip --overwrite-dest",
     "package:chrome": "web-ext build -s dist/chrome -a artifacts --filename ghcr-tag-sizes-chrome.zip --overwrite-dest",
     "package": "npm run build && npm run package:firefox && npm run package:chrome",
-    "sign:firefox": "npm run build:firefox && web-ext sign --source-dir dist/firefox --channel unlisted --artifacts-dir artifacts",
+    "sign:firefox": "npm run build:firefox && web-ext sign --source-dir dist/firefox --channel unlisted --artifacts-dir artifacts && mv -f $(ls -t artifacts/*.xpi | head -1) artifacts/ghcr-tag-sizes-firefox.xpi",
     "lint": "npm run build:firefox && web-ext lint --source-dir dist/firefox --no-config",
     "test": "node --import tsx --test test/unit/*.test.ts test/dom/*.test.ts",
     "test:live": "node --import tsx --test test/live/*.test.ts",

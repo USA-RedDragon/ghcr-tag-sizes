@@ -58,6 +58,8 @@ jobs:
           fi
           # Reuse the dist/firefox we just built — sign it in place, no rebuild.
           npx web-ext sign --source-dir dist/firefox --channel unlisted --artifacts-dir artifacts
+          # web-ext names the file with AMO's id hash — give it a clean, stable name.
+          mv -f "$(ls -t artifacts/*.xpi | head -1)" artifacts/ghcr-tag-sizes-firefox.xpi
 
       - name: Upload extension packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
