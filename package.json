@@ -27,7 +27,7 @@
     "e2e": "npm run e2e:firefox && npm run e2e:chrome"
   },
   "devDependencies": {
-    "@types/jsdom": "28.0.3",
+    "@types/jsdom": "30.0.0",
     "@types/node": "26.2.0",
     "@types/selenium-webdriver": "4.35.6",
     "geckodriver": "6.1.1",
