@@ -35,7 +35,7 @@
     "selenium-webdriver": "4.49.0",
     "tsx": "4.23.13",
     "typescript": "7.0.2",
-    "vite": "8.2.2",
+    "vite": "8.3.0",
     "vite-plugin-web-extension": "4.5.1",
     "web-ext": "10.6.0"
   }
