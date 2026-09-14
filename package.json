@@ -29,7 +29,7 @@
   "devDependencies": {
     "@types/jsdom": "28.0.3",
     "@types/node": "26.5.1",
-    "@types/selenium-webdriver": "4.35.6",
+    "@types/selenium-webdriver": "4.35.7",
     "geckodriver": "6.1.1",
     "jsdom": "30.0.1",
     "selenium-webdriver": "4.49.0",
