@@ -30,7 +30,7 @@
     "@types/jsdom": "28.0.3",
     "@types/node": "26.6.2",
     "@types/selenium-webdriver": "4.35.7",
-    "geckodriver": "6.1.1",
+    "geckodriver": "7.0.0",
     "jsdom": "30.0.1",
     "selenium-webdriver": "4.49.0",
     "tsx": "4.23.15",
