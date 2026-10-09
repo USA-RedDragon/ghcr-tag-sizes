@@ -4,7 +4,7 @@
 // (ghcr.io sends no CORS headers). Private images get a "sign in" button that runs
 // GitHub's OAuth device flow, then every such badge is re-measured.
 
-import { extractDigest, formatBytes, parseImagePath } from "./lib.ts";
+import { OAUTH_APP_SETTINGS_URL, extractDigest, formatBytes, parseImagePath } from "./lib.ts";
 import type { ExtApi, SizeResult } from "./types.ts";
 
 const api: ExtApi | undefined = globalThis.browser ?? globalThis.chrome;
@@ -25,7 +25,9 @@ function renderResult(badge: HTMLElement, result: SizeResult): void {
 
   if (result.needsAuth) {
     badge.classList.add("ghcr-size-badge--error", "ghcr-size-badge--auth");
-    renderSignIn(badge);
+    badge.classList.toggle("ghcr-size-badge--no-access", !!result.signedIn);
+    if (result.signedIn) renderNoAccess(badge, result.error);
+    else renderSignIn(badge);
     return;
   }
   if (result.error || !result.arches || !result.arches.length) {
@@ -88,6 +90,48 @@ function renderSignIn(badge: HTMLElement, note?: string): void {
   if (note) badge.append(` — ${note}`);
 }
 
+function link(href: string, text: string): HTMLAnchorElement {
+  const a = document.createElement("a");
+  a.href = href;
+  a.target = "_blank";
+  a.rel = "noopener";
+  a.textContent = text;
+  return a;
+}
+
+/**
+ * Signed in, but the token still can't read this package — usually the org wasn't
+ * granted during authorization. Point at the app's GitHub settings (badges re-measure
+ * when the tab regains focus) and offer a fresh sign-in.
+ */
+function renderNoAccess(badge: HTMLElement, detail?: string): void {
+  badge.textContent = "🔒 no access — ";
+  badge.appendChild(link(OAUTH_APP_SETTINGS_URL, "grant org access"));
+  badge.append(" or ");
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "ghcr-size-signin";
+  btn.textContent = "sign in again";
+  btn.addEventListener("click", () => void signIn());
+  badge.appendChild(btn);
+  badge.title =
+    "Your GitHub sign-in can't read this package. Grant GHCR Tag Sizes access to the " +
+    "package's organization on GitHub, then come back to this tab." +
+    (detail ? `\n${detail}` : "");
+}
+
+/** Drop private badges so scan() measures those rows again. */
+function remeasure(selector = AUTH_BADGES): void {
+  const badges = document.querySelectorAll<HTMLElement>(selector);
+  if (!badges.length) return;
+  badges.forEach((b) => {
+    const row = b.closest<HTMLElement>("li.Box-row");
+    if (row) delete row.dataset.ghcrSized;
+    b.remove();
+  });
+  scan();
+}
+
 function eachAuthBadge(fn: (badge: HTMLElement) => void): void {
   document.querySelectorAll<HTMLElement>(AUTH_BADGES).forEach(fn);
 }
@@ -100,13 +144,8 @@ function renderUserCode(badge: HTMLElement, userCode: string, verificationUri: s
   code.textContent = userCode;
   badge.appendChild(code);
   badge.append(" at ");
-  const link = document.createElement("a");
-  link.href = verificationUri;
-  link.target = "_blank";
-  link.rel = "noopener";
-  link.textContent = verificationUri.replace(/^https:\/\//, "");
-  badge.appendChild(link);
-  badge.append(" (copied)");
+  badge.appendChild(link(verificationUri, verificationUri.replace(/^https:\/\//, "")));
+  badge.append(" (copied) — grant your organizations access when asked");
 }
 
 const sleep = (s: number): Promise<void> => new Promise((r) => setTimeout(r, s * 1000));
@@ -140,13 +179,7 @@ async function signIn(): Promise<void> {
         eachAuthBadge((b) => renderSignIn(b, poll.error));
         return;
       }
-      // Signed in: drop the private badges and let scan() measure those rows again.
-      eachAuthBadge((b) => {
-        const row = b.closest<HTMLElement>("li.Box-row");
-        if (row) delete row.dataset.ghcrSized;
-        b.remove();
-      });
-      scan();
+      remeasure();
       return;
     }
     eachAuthBadge((b) => renderSignIn(b, "code expired"));
@@ -207,6 +240,11 @@ scheduleScan();
 document.addEventListener("turbo:load", scheduleScan);
 document.addEventListener("turbo:render", scheduleScan);
 document.addEventListener("pjax:end", scheduleScan);
+
+// Back from granting org access on GitHub's settings page: retry the no-access badges.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && !signingIn) remeasure(".ghcr-size-badge--no-access");
+});
 
 // Fallback: catch rows added by pagination / late render.
 const observer = new MutationObserver((mutations) => {

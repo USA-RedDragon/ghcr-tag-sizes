@@ -8,7 +8,7 @@
 // GitHub's OAuth device flow (on github.com, where they're already logged in), and the
 // resulting read:packages token is kept in storage.local.
 
-import { computeArches } from "./lib.ts";
+import { OAUTH_CLIENT_ID, computeArches } from "./lib.ts";
 import type { DeviceCode, ExtApi, Manifest, SignInPoll, SizeResult } from "./types.ts";
 
 const api: ExtApi | undefined = globalThis.browser ?? globalThis.chrome;
@@ -17,10 +17,6 @@ const ext = api;
 
 const REGISTRY = "https://ghcr.io";
 
-// Public identifier of the "GHCR Tag Sizes" GitHub OAuth App (device flow enabled).
-// Not a secret: the device flow needs no client secret.
-const OAUTH_CLIENT_ID = "Ov23liyUYe0Csqq9U7EP";
-
 const MANIFEST_ACCEPT = [
   "application/vnd.oci.image.index.v1+json",
   "application/vnd.docker.distribution.manifest.list.v2+json",
@@ -28,8 +24,13 @@ const MANIFEST_ACCEPT = [
   "application/vnd.oci.image.manifest.v1+json",
 ].join(", ");
 
-interface CachedToken {
+interface RegistryToken {
   token: string;
+  /** Minted with the signed-in GitHub identity (the anonymous token was refused). */
+  authed: boolean;
+}
+
+interface CachedToken extends RegistryToken {
   expiresAt: number;
 }
 
@@ -43,8 +44,16 @@ const tokenCache = new Map<string, CachedToken>();
 // `${image}@${digest}` -> result (digests are immutable, cache forever)
 const sizeCache = new Map<string, SizeResult>();
 
-/** Signals that an image needs authentication (surfaced to the UI). */
-class AuthError extends Error {}
+/**
+ * Signals that an image needs authentication (surfaced to the UI). `signedIn` means the
+ * stored GitHub token was tried and still can't read it — typically the OAuth app
+ * wasn't granted access to the image's organization.
+ */
+class AuthError extends Error {
+  constructor(message: string, readonly signedIn = false) {
+    super(message);
+  }
+}
 
 async function loadAuth(): Promise<GitHubAuth | null> {
   const { githubAuth } = await ext.storage.local.get("githubAuth");
@@ -64,17 +73,18 @@ function requestToken(image: string, auth: GitHubAuth | null): Promise<Response>
  * Obtain a bearer pull-token for `image` (`owner/name`), cached per image. Tries
  * anonymously first (public images), then with the signed-in GitHub token.
  */
-async function getToken(image: string): Promise<string> {
+async function getToken(image: string): Promise<RegistryToken> {
   const cached = tokenCache.get(image);
-  if (cached && cached.expiresAt > Date.now()) return cached.token;
+  if (cached && cached.expiresAt > Date.now()) return cached;
 
+  let authed = false;
   let res = await requestToken(image, null);
   if (res.status === 401 || res.status === 403) {
     const auth = await loadAuth();
-    if (auth) res = await requestToken(image, auth);
-  }
-  if (res.status === 401 || res.status === 403) {
-    throw new AuthError(`Auth required for ${image} (HTTP ${res.status})`);
+    if (!auth) throw new AuthError(`Auth required for ${image} (HTTP ${res.status})`);
+    authed = true;
+    res = await requestToken(image, auth);
+    if (!res.ok) throw new AuthError(`GitHub token can't read ${image} (HTTP ${res.status})`, true);
   }
   if (!res.ok) throw new Error(`Token request failed (HTTP ${res.status})`);
 
@@ -84,8 +94,9 @@ async function getToken(image: string): Promise<string> {
 
   // Respect expires_in when present; default to 5 minutes, refresh 30s early.
   const ttl = (data.expires_in ?? 300) * 1000;
-  tokenCache.set(image, { token, expiresAt: Date.now() + ttl - 30_000 });
-  return token;
+  const entry = { token, authed, expiresAt: Date.now() + ttl - 30_000 };
+  tokenCache.set(image, entry);
+  return entry;
 }
 
 /** POST a form to github.com's OAuth endpoints and parse the JSON reply. */
@@ -148,12 +159,15 @@ async function signInPoll(deviceCode: string): Promise<SignInPoll> {
 }
 
 /** GET a manifest (or index) by tag/digest and return the parsed JSON. */
-async function fetchManifest(image: string, ref: string, token: string): Promise<Manifest> {
+async function fetchManifest(image: string, ref: string, { token, authed }: RegistryToken): Promise<Manifest> {
   const res = await fetch(`${REGISTRY}/v2/${image}/manifests/${ref}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: MANIFEST_ACCEPT },
   });
-  if (res.status === 401 || res.status === 403) {
-    throw new AuthError(`Not authorized to read ${image} (HTTP ${res.status})`);
+  // ghcr.io answers 404 rather than 403 when a signed-in identity lacks access.
+  if (res.status === 401 || res.status === 403 || (authed && res.status === 404)) {
+    // Don't reuse this pull token: access may be granted on GitHub at any moment.
+    tokenCache.delete(image);
+    throw new AuthError(`Not authorized to read ${image} (HTTP ${res.status})`, authed);
   }
   if (!res.ok) throw new Error(`Manifest ${ref} failed (HTTP ${res.status})`);
   return (await res.json()) as Manifest;
@@ -185,7 +199,11 @@ ext.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       resolveSizes(msg.image, msg.digest)
         .then(sendResponse)
         .catch((err: unknown) =>
-          sendResponse(err instanceof AuthError ? { needsAuth: true } : { error: errorMessage(err) })
+          sendResponse(
+            err instanceof AuthError
+              ? { needsAuth: true, signedIn: err.signedIn, error: err.message }
+              : { error: errorMessage(err) }
+          )
         );
       return true;
     case "signInStart":

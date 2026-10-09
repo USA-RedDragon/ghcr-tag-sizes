@@ -27,6 +27,8 @@ export interface Arch {
 export interface SizeResult {
   arches?: Arch[];
   needsAuth?: boolean;
+  /** With needsAuth: the signed-in GitHub token was tried and still can't read it. */
+  signedIn?: boolean;
   error?: string;
 }
 

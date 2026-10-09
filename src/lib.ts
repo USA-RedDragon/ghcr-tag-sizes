@@ -1,5 +1,12 @@
 import type { Arch, IndexEntry, Manifest, Platform } from "./types.ts";
 
+// Public identifier of the "GHCR Tag Sizes" GitHub OAuth App (device flow enabled).
+// Not a secret: the device flow needs no client secret.
+export const OAUTH_CLIENT_ID = "Ov23liyUYe0Csqq9U7EP";
+
+/** GitHub page where the user manages this app's authorization and org access. */
+export const OAUTH_APP_SETTINGS_URL = `https://github.com/settings/connections/applications/${OAUTH_CLIENT_ID}`;
+
 const DIGEST_RE = /sha256:[0-9a-f]{64}/;
 const UNITS = ["B", "KB", "MB", "GB", "TB"] as const;
 
