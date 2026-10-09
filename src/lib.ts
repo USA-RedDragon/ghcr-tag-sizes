@@ -64,12 +64,13 @@ export async function computeArches(
 /**
  * Derive the ghcr.io image path (`owner/name`, lowercased) from a GitHub package URL.
  * Handles both page shapes:
- *   - account-scoped: /orgs|users/<owner>/packages/container/[package/]<name>
+ *   - account-scoped: /orgs|users|-/<owner>/packages/container/[package/]<name>
+ *     (`/-/` is where a ghcr.io/<owner>/<name> link redirects)
  *   - repo-scoped:    /<owner>/<repo>/pkgs/container/<name>   (repo is not part of the image)
  */
 export function parseImagePath(pathname: string): string | null {
   const account = pathname.match(
-    /\/(?:orgs|users)\/([^/]+)\/packages\/container\/(?:package\/)?([^/?#]+)/
+    /\/(?:orgs|users|-)\/([^/]+)\/packages\/container\/(?:package\/)?([^/?#]+)/
   );
   if (account) return `${account[1]}/${account[2]}`.toLowerCase();
 

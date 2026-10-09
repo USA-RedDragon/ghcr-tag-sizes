@@ -15,14 +15,20 @@ function assertCommon(m: any, label: string): void {
   assert.equal(m.manifest_version, 3, `${label}: MV3`);
   assert.equal(m.name, "GHCR Tag Sizes", `${label}: name`);
   assert.match(m.version, /^\d+\.\d+\.\d+(\.\d+)?$/, `${label}: version (3- or 4-part)`);
-  assert.deepEqual(m.host_permissions, ["https://ghcr.io/*"], `${label}: host perms`);
+  assert.deepEqual(
+    m.host_permissions,
+    ["https://ghcr.io/*", "https://github.com/*", "https://api.github.com/*"],
+    `${label}: host perms`
+  );
+  assert.deepEqual(m.permissions, ["storage"], `${label}: permissions`);
 
   const cs = m.content_scripts[0];
   assert.deepEqual(cs.js, ["src/content.ts"], `${label}: content js`);
-  // All three GitHub package-page URL shapes are matched.
+  // Every GitHub package-page URL shape is matched.
   for (const pat of [
     "https://github.com/orgs/*/packages/container/*",
     "https://github.com/users/*/packages/container/*",
+    "https://github.com/-/*/packages/container/*",
     "https://github.com/*/*/pkgs/container/*",
   ]) {
     assert.ok(cs.matches.includes(pat), `${label}: matches ${pat}`);

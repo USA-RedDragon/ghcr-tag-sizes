@@ -21,12 +21,15 @@ export function generateManifest(target: Target): Record<string, unknown> {
     version,
     description:
       "Shows the total layer size (per architecture) of each tag on GitHub Container Registry package pages.",
-    host_permissions: ["https://ghcr.io/*"],
+    // github.com + api.github.com: OAuth device flow for private images (no PAT).
+    permissions: ["storage"],
+    host_permissions: ["https://ghcr.io/*", "https://github.com/*", "https://api.github.com/*"],
     content_scripts: [
       {
         matches: [
           "https://github.com/orgs/*/packages/container/*",
           "https://github.com/users/*/packages/container/*",
+          "https://github.com/-/*/packages/container/*",
           "https://github.com/*/*/pkgs/container/*",
         ],
         js: ["src/content.ts"],

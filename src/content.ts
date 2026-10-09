@@ -1,7 +1,8 @@
 // Scans GitHub container package pages, reads each version's digest from the
 // server-rendered markup, asks the background for its per-architecture layer sizes,
 // and injects a badge beneath the tag pills. All network happens in the background
-// (ghcr.io sends no CORS headers).
+// (ghcr.io sends no CORS headers). Private images get a "sign in" button that runs
+// GitHub's OAuth device flow, then every such badge is re-measured.
 
 import { extractDigest, formatBytes, parseImagePath } from "./lib.ts";
 import type { ExtApi, SizeResult } from "./types.ts";
@@ -23,9 +24,8 @@ function renderResult(badge: HTMLElement, result: SizeResult): void {
   badge.classList.remove("ghcr-size-badge--error");
 
   if (result.needsAuth) {
-    badge.classList.add("ghcr-size-badge--error");
-    badge.textContent = "🔒 sign in to view size";
-    badge.title = "This package is private — sign in to GitHub to see its size.";
+    badge.classList.add("ghcr-size-badge--error", "ghcr-size-badge--auth");
+    renderSignIn(badge);
     return;
   }
   if (result.error || !result.arches || !result.arches.length) {
@@ -70,6 +70,91 @@ function renderResult(badge: HTMLElement, result: SizeResult): void {
     ? "Total layer size per architecture (compressed download size).\n" +
       arches.map((a) => `${a.label}: ${formatBytes(a.bytes)}`).join("\n")
     : `Total layer size (compressed download size): ${formatBytes(total)}`;
+}
+
+const AUTH_BADGES = ".ghcr-size-badge--auth";
+let signingIn = false;
+
+/** Put a "sign in" button in a private-image badge. */
+function renderSignIn(badge: HTMLElement, note?: string): void {
+  badge.textContent = "";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "ghcr-size-signin";
+  btn.textContent = "🔒 sign in to view size";
+  btn.title = "Private package — authorize GHCR Tag Sizes on GitHub (read:packages) to see sizes.";
+  btn.addEventListener("click", () => void signIn());
+  badge.appendChild(btn);
+  if (note) badge.append(` — ${note}`);
+}
+
+function eachAuthBadge(fn: (badge: HTMLElement) => void): void {
+  document.querySelectorAll<HTMLElement>(AUTH_BADGES).forEach(fn);
+}
+
+/** Show the device-flow user code (with a link to enter it) in every private badge. */
+function renderUserCode(badge: HTMLElement, userCode: string, verificationUri: string): void {
+  badge.textContent = "🔒 enter code ";
+  const code = document.createElement("strong");
+  code.className = "ghcr-size-code";
+  code.textContent = userCode;
+  badge.appendChild(code);
+  badge.append(" at ");
+  const link = document.createElement("a");
+  link.href = verificationUri;
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.textContent = verificationUri.replace(/^https:\/\//, "");
+  badge.appendChild(link);
+  badge.append(" (copied)");
+}
+
+const sleep = (s: number): Promise<void> => new Promise((r) => setTimeout(r, s * 1000));
+
+/** Run the OAuth device flow, then re-measure every private badge on the page. */
+async function signIn(): Promise<void> {
+  if (signingIn) return;
+  signingIn = true;
+  try {
+    const start = await ext.runtime.sendMessage({ type: "signInStart" });
+    if ("error" in start) {
+      eachAuthBadge((b) => renderSignIn(b, start.error));
+      return;
+    }
+
+    // Still inside the click's user activation, so the popup and clipboard are allowed.
+    void navigator.clipboard?.writeText(start.userCode).catch(() => {});
+    window.open(start.verificationUri, "_blank", "noopener");
+    eachAuthBadge((b) => renderUserCode(b, start.userCode, start.verificationUri));
+
+    let interval = start.interval;
+    const deadline = Date.now() + start.expiresIn * 1000;
+    while (Date.now() < deadline) {
+      await sleep(interval);
+      const poll = await ext.runtime.sendMessage({ type: "signInPoll", deviceCode: start.deviceCode });
+      if (poll.status === "pending") {
+        interval = poll.interval || interval;
+        continue;
+      }
+      if (poll.status === "failed") {
+        eachAuthBadge((b) => renderSignIn(b, poll.error));
+        return;
+      }
+      // Signed in: drop the private badges and let scan() measure those rows again.
+      eachAuthBadge((b) => {
+        const row = b.closest<HTMLElement>("li.Box-row");
+        if (row) delete row.dataset.ghcrSized;
+        b.remove();
+      });
+      scan();
+      return;
+    }
+    eachAuthBadge((b) => renderSignIn(b, "code expired"));
+  } catch (err: unknown) {
+    eachAuthBadge((b) => renderSignIn(b, err instanceof Error ? err.message : String(err)));
+  } finally {
+    signingIn = false;
+  }
 }
 
 /** Find the insertion point within a version row and attach the badge. */

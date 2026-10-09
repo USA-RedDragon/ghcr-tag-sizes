@@ -39,6 +39,10 @@ test("parseImagePath handles account-scoped, package/, versions, and casing", ()
   assert.equal(GHCR.parseImagePath("/orgs/Acme/packages/container/Widget/versions"), "acme/widget");
   assert.equal(GHCR.parseImagePath("/users/octocat/packages/container/package/thing"), "octocat/thing");
   assert.equal(GHCR.parseImagePath("/orgs/acme/packages/container/widget/385518471?tag=beta"), "acme/widget");
+  assert.equal(
+    GHCR.parseImagePath("/-/SRS-Hosting/packages/container/package/path-of-titans"),
+    "srs-hosting/path-of-titans"
+  );
   assert.equal(GHCR.parseImagePath("/USA-RedDragon"), null);
 });
 

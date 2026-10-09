@@ -36,3 +36,21 @@
 .ghcr-size-sep {
   color: var(--borderColor-default, var(--color-border-default, #d0d7de));
 }
+
+.ghcr-size-signin {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--fgColor-accent, var(--color-accent-fg, #0969da));
+  cursor: pointer;
+}
+
+.ghcr-size-signin:hover {
+  text-decoration: underline;
+}
+
+.ghcr-size-code {
+  font-family: var(--fontStack-monospace, ui-monospace, monospace);
+  color: var(--fgColor-default, var(--color-fg-default, #1f2328));
+}

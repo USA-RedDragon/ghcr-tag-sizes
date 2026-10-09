@@ -10,7 +10,8 @@ download size — read straight from the OCI image manifest.
 ## How it works
 
 - Runs on every GitHub container package URL shape:
-  - account-scoped `github.com/{orgs,users}/*/packages/container/*` (overview & `…/versions`)
+  - account-scoped `github.com/{orgs,users,-}/*/packages/container/*` (overview & `…/versions`;
+    `/-/` is where a `ghcr.io/<owner>/<name>` link redirects)
   - repo-scoped `github.com/{owner}/{repo}/pkgs/container/*`
   covering both **tagged and untagged** versions.
 - For each version row it reads the **digest** already present in the page markup —
@@ -21,10 +22,14 @@ download size — read straight from the OCI image manifest.
   per-architecture sub-manifest → sum `layers[].size`. Results are cached by digest.
 - Network lives in the background because `ghcr.io` sends no CORS headers; the
   `https://ghcr.io/*` host permission lets the background fetch bypass CORS.
-- **No PAT, ever.** Requests use `credentials: "include"`, so any ghcr.io session the
-  browser already holds from your GitHub login is used automatically — public images
-  just work, private images you can access resolve on your existing session, and
-  anything else shows `🔒 sign in to view size`.
+- **No PAT, ever.** Public images use ghcr.io's anonymous pull token. ghcr.io sets no
+  cookies and ignores your github.com session, so private images show
+  `🔒 sign in to view size` — click it once and the extension runs GitHub's **OAuth
+  device flow**: it opens `github.com/login/device` (code pre-copied), you approve
+  *GHCR Tag Sizes* for `read:packages`, and every private badge re-measures. The OAuth
+  token is kept in the extension's `storage.local` and only sent to ghcr.io after an
+  anonymous request is refused. Revoke it any time under GitHub → Settings →
+  Applications.
 - Attestation/provenance entries (platform `unknown`) are skipped.
 
 ## Develop
